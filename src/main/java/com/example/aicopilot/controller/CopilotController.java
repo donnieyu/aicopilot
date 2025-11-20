@@ -4,11 +4,13 @@ import com.example.aicopilot.dto.JobStatus;
 import com.example.aicopilot.service.JobRepository;
 import com.example.aicopilot.service.WorkflowOrchestrator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl; // 추가
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit; // 추가
 
 @RestController
 @RequestMapping("/api/copilot")
@@ -52,6 +54,13 @@ public class CopilotController {
         if (status == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(status);
+
+        // ETag 생성 (버전 기반)
+        String etag = "\"" + status.version() + "\"";
+
+        return ResponseEntity.ok()
+                .eTag(etag) // ETag 헤더 설정
+                .cacheControl(CacheControl.maxAge(0, TimeUnit.SECONDS).cachePrivate().mustRevalidate()) // 캐시 정책
+                .body(status);
     }
 }
