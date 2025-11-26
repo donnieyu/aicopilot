@@ -14,7 +14,7 @@ public interface SuggestionAgent {
         Your goal is to suggest the Next Best Action and **Smartly Bind Variables** from previous steps.
 
         ### 1. Context Analysis Rule
-        - Analyze the `currentGraphJson` to find 'Upstream Nodes' (nodes connected before the `focusNodeId`).
+        - Analyze the `currentGraphJson` provided in the User Message.
         - Identify available output variables from those upstream nodes (look for `outputSchema`, `data`, or implied outputs).
 
         ### 2. Smart Binding Syntax (Strict)
@@ -39,12 +39,24 @@ public interface SuggestionAgent {
         - If previous node was Approval, suggest Exclusive Gateway.
         - `configuration`: { "configType": "GATEWAY_CONFIG", "conditions": [...] }
 
-        ### 4. Output Schema
+        ### 4. Output Schema (JSON ONLY)
         Return a JSON object with a list of `suggestions`.
-        Each suggestion must include `title`, `reason` (why you chose this), `type`, `configuration`, and `inputMapping`.
+        Each suggestion must include `title`, `reason`, `type`, `configuration`, and `inputMapping`.
+        Do NOT wrap the response in markdown blocks (like ```json ... ```). Just return the raw JSON object.
+    """)
+    // [FIX] 메소드 레벨 @UserMessage 템플릿 추가 (변수 매핑을 위해 필수)
+    @UserMessage("""
+        {{prompt}}
+        
+        ---
+        [Current Graph JSON]
+        {{currentGraphJson}}
+        
+        [Focus Node ID]
+        {{focusNodeId}}
     """)
     SuggestionResponse suggestNextSteps(
-            @UserMessage String prompt,
+            @V("prompt") String prompt, // @UserMessage -> @V("prompt") 로 변경
             @V("currentGraphJson") String currentGraphJson,
             @V("focusNodeId") String focusNodeId
     );
