@@ -8,6 +8,7 @@ import com.example.aicopilot.dto.analysis.AnalysisReport;
 import com.example.aicopilot.dto.analysis.AnalysisResult;
 import com.example.aicopilot.dto.definition.ProcessDefinition;
 import com.example.aicopilot.dto.definition.ProcessStep;
+import com.example.aicopilot.dto.form.FormDefinitions; // [New] Import
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
 import com.example.aicopilot.service.DataContextService;
 import com.example.aicopilot.service.JobRepository;
@@ -198,5 +199,19 @@ public class CopilotController {
                     "message", e.getMessage() != null ? e.getMessage() : "Unknown Error"
             ));
         }
+    }
+
+    /**
+     * 8. [New] Form Suggestion Endpoint
+     * Generates a Form Definition from a natural language request.
+     */
+    @PostMapping("/suggest/form")
+    public ResponseEntity<FormDefinitions> suggestForm(@RequestBody Map<String, String> request) {
+        String prompt = request.get("prompt");
+        if (prompt == null || prompt.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        FormDefinitions form = suggestionAgent.suggestFormDefinition(prompt);
+        return ResponseEntity.ok(form);
     }
 }

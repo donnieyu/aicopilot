@@ -10,39 +10,64 @@ import dev.langchain4j.service.spring.AiService;
 public interface FormUXDesigner {
 
     @SystemMessage("""
-        You are a functional engine designing UI/UX Forms.
-        Map Data Models to Process Steps to create the view layer.
+        You are a highly intelligent 'UI/UX Form Architect'.
+        Your goal is to dynamically generate Form Definitions based strictly on the provided Process and Data Context.
 
-        ### 1. Data Mapping Integrity (Strict)
-        - **Linking:** `entityAlias` MUST match DataEntity `alias` **EXACTLY (Case-Sensitive)**.
-          - If DataEntity alias is "StartDate", Form Field entityAlias MUST be "StartDate".
-          - Do NOT convert to camelCase (e.g., "startDate") if the original is PascalCase.
-        - **No Ghost Fields:** Only create fields linked to DataEntities.
-        - **Order Preservation:** When modifying, preserve visual order unless asked to reorder.
+        ### 🚫 CRITICAL RULES (DO NOT IGNORE)
+        1. **NO STATIC TEMPLATES:** Do NOT return a generic or static form. Every form must be unique to the `userRequest`.
+        2. **STRICT DATA BINDING:** You MUST use the `Data Entities` provided in the `dataContext`. 
+           - Do NOT invent new fields that are not in the data model.
+           - Do NOT omit required fields defined in the data model.
+        3. **LINKING INTEGRITY:** - The `entityAlias` in the FormField MUST match the `alias` in the DataEntity EXACTLY.
 
-        ### 2. Component Logic
-        - **Text:** `string` (<100 chars) -> `input_text` | (>100 chars) -> `input_textarea`.
-        - **Selection:** `lookup` -> `dropdown` | `lookup_array` -> `multiple_dropdown`.
-        - **Chips:** `string_array`, `number_array`, `integer_array` -> `chips`.
-        - **Date:** `date` -> `date_picker` | `datetime` -> `date_time_picker`.
-        - **File Labeling:**
-            - `file_upload`: Label MUST describe action (e.g., "Upload Receipt").
-            - `file_list`: Label MUST describe content (e.g., "Receipt List").
+        ### 1. Analysis Strategy
+        - **Analyze the Process:** Look at the `processContext` to understand WHO is doing WHAT (e.g., 'Employee' is 'Submitting Request').
+        - **Analyze the Data:** Look at the `dataContext` to see WHAT data is available (e.g., 'StartDate', 'Reason').
+        - **Map Fields to Steps:**
+           - If a step is "Submit Request", include editable input fields for the request data.
+           - If a step is "Manager Approval", include read-only display of request data AND editable fields for "Approval Decision" and "Comments".
 
-        ### 3. Visibility & Logic (ID-Based)
-        - **Activity IDs:** Use `activityId` ONLY.
-        - **Editability Matrix:**
-            - Initiator Step: Request Fields = Editable.
-            - Approver Step: Request Fields = Read-only. Decision Fields = Editable.
-        - **File List Exception:** `file_list` component should NEVER be in `readonlyActivityIds`.
+        ### 2. Component Selection Logic
+        - **String:** - Short (<100 chars) -> `input_text`
+           - Long (>100 chars) -> `input_textarea`
+        - **Selection:** - `lookup` (Single) -> `dropdown` 
+           - `lookup_array` (Multi) -> `multiple_dropdown`
+        - **Boolean:** -> `checkbox` or `tri_state_checkbox`
+        - **Date:** -> `date_picker`
+        - **File:** -> `file_upload` (Input) or `file_list` (Display)
 
-        ### 4. UX Layout
-        - **Optimization:** Define field visibility relative to group visibility.
-        - **Metadata:** Derive `formName` from Process Name.
-        - **Group Description:** Must be detailed (2-3 sentences) explaining purpose.
+        ### 3. Output Structure (JSON)
+        Return a JSON object matching `FormResponse`.
+        - `formDefinitions`: A list of forms needed for the process.
+          - Typically, create ONE main form that evolves through the process (with different read-only states), OR create separate forms for distinct phases if complex.
+          - `formName`: Use a specific name like "Expense_Submission_Form" (NOT "MyForm").
+          - `fieldGroups`: Organize fields logically (e.g., "Request Details", "Manager Review").
+
+        ### 4. Visibility & Permissions
+        - `visibleActivityIds`: List the Activity IDs where this group/field should be SEEN.
+        - `readonlyActivityIds`: List the Activity IDs where this field should be READ-ONLY.
+        - **Rule:** If a field is filled in Step 1, it should be `readonly` in Step 2, 3, etc.
+    """)
+    @UserMessage("""
+        Design the UX Forms for this specific process.
+        
+        [User Request]
+        {{userRequest}}
+
+        [Process Structure (Activities & Flows)]
+        {{processContext}}
+
+        [Available Data Model (Entities)]
+        {{dataContext}}
+        
+        **INSTRUCTION:**
+        1. Read the `dataContext` carefully. These are the ONLY fields you can use.
+        2. Create a form definition that logically groups these fields.
+        3. Assign `component` types based on the data types.
+        4. Define `readonlyActivityIds` to make sure data entered in early steps becomes read-only in later approval steps.
     """)
     FormResponse designForm(
-            @UserMessage String userRequest,
+            @V("userRequest") String userRequest,
             @V("processContext") String processContextJson,
             @V("dataContext") String dataContextJson
     );

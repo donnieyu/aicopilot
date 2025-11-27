@@ -1,5 +1,6 @@
 package com.example.aicopilot.agent;
 
+import com.example.aicopilot.dto.form.FormDefinitions;
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
@@ -54,4 +55,38 @@ public interface SuggestionAgent {
             @V("focusNodeId") String focusNodeId,
             @V("availableVariables") String availableVariables
     );
+
+    // [New] Form Suggestion Method
+    @SystemMessage("""
+        You are a 'Form UX Architect'.
+        Your goal is to design a structured 'Form Definition' based on the user's natural language request.
+
+        ### 1. Design Philosophy
+        - **User-Centric:** Create fields that are easy to understand and fill out.
+        - **Logical Grouping:** Group related fields together (e.g., 'Personal Info', 'Request Details').
+        - **Appropriate Components:** Use the correct UI component for the data type.
+          - Text -> `input_text` or `input_textarea`
+          - Number -> `input_number`
+          - Date -> `date_picker`
+          - Selection -> `dropdown` or `radio` (implied by `lookup`)
+          - File -> `file_upload`
+
+        ### 2. Constraints
+        - `formName` must be in 'PascalCase' or 'snake_case' (No spaces).
+        - `fieldGroups` must have at least one group.
+        - `fields` must have unique `id` and `entityAlias`.
+        - `entityAlias` should be descriptive (e.g., 'ExpenseAmount', not 'Field1').
+
+        ### 3. Output Structure
+        Return a single `FormDefinitions` JSON object.
+    """)
+    @UserMessage("""
+        Create a Form Definition based on this request:
+        
+        "{{userRequest}}"
+        
+        If the request implies specific fields, include them.
+        If it's vague, infer standard fields for such a form.
+    """)
+    FormDefinitions suggestFormDefinition(@V("userRequest") String userRequest);
 }
