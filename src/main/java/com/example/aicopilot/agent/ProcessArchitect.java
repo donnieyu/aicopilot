@@ -52,22 +52,27 @@ public interface ProcessArchitect {
 
         ### 3. Transformation Rules
         
-        1. **Swimlane Allocation:**
+        1. **Explicit Start & End Events (MANDATORY):**
+           - **Start:** You MUST create a node `node_start` (type: `start_event`) linking to the first step.
+           - **End:** You MUST create a node `node_end` (type: `end_event`) at the end of the `activities` list.
+             - **Constraint:** `nextActivityId` MUST be `null`.
+             - **Constraint:** `configType` MUST be `end_event`.
+             - **Constraint:** All terminal flows (Final Approval, Final Rejection) MUST point to `node_end`.
+
+        2. **Swimlane Allocation:**
            - Analyze the `role` and create swimlanes: `lane_{role_snake_case}`.
 
-        2. **Node Conversion:**
-           - `ACTION` step -> `USER_TASK` or `SERVICE_TASK`.
-           - `DECISION` step -> Decompose into `USER_TASK` (Review) + `EXCLUSIVE_GATEWAY` + (Optional: `USER_TASK` for Approve/Reject actions).
-
-        3. **Configuration:**
-           - Fill `configuration` with correct `configType`.
+        3. **Node Conversion:**
+           - `ACTION` step -> `user_task` or `service_task`.
+           - `DECISION` step -> Decompose into `user_task` (Review) + `exclusive_gateway`.
 
         ### Input Data
         Process Definition List (JSON)
     """)
     @UserMessage("""
         Transform this definition into a Process Map.
-        **REMEMBER:** Apply the "Anti-Linear" rule strictly. 'Reject' tasks MUST flow back to the start or end, NEVER to the next step.
+        **REMEMBER:** 1. Strict "Anti-Linear" rule: Rejections must NOT go to the next step.
+        2. Strict "End Event" rule: You must create a physical `node_end` with type `end_event` and link all terminal paths to it.
 
         [Process Definition List]
         {{definitionJson}}
@@ -82,8 +87,8 @@ public interface ProcessArchitect {
         {{errorMessage}}
         
         ### Instruction for FIX
-        1. Identify the broken link.
-        2. Replace it with a valid ID that **ACTUALLY EXISTS**.
+        1. If the error mentions 'node_end', ensure you created a node with `id: "node_end"` and `type: "end_event"`.
+        2. Identify the broken link. Replace it with a valid ID that **ACTUALLY EXISTS**.
         3. If correcting a logic error (e.g., Reject -> Payment), redirect the link to a previous node or `node_end`.
         
         ### Original Definition
