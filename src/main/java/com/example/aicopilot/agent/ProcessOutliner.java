@@ -1,15 +1,18 @@
 package com.example.aicopilot.agent;
 
 import com.example.aicopilot.dto.definition.ProcessDefinition;
+import com.example.aicopilot.dto.definition.ProcessStep;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import dev.langchain4j.service.spring.AiService;
 
+import java.util.List;
+
 @AiService
 public interface ProcessOutliner {
 
-    // ... (기존 draftDefinition 메서드 유지) ...
+    // ... (기존 메서드들: draftDefinition, suggestSteps 유지) ...
     @SystemMessage("""
         You are a 'Business Process Analyst'.
         Your goal is to draft a **Structured Process Definition List** from user requirements.
@@ -28,7 +31,6 @@ public interface ProcessOutliner {
     """)
     ProcessDefinition draftDefinition(String userRequest);
 
-    // [Updated] Outline Suggestion API with Enhanced Prompt
     @UserMessage("""
         Based on the Topic and Description provided by the user, **Draft** a detailed process step list.
         
@@ -49,5 +51,39 @@ public interface ProcessOutliner {
     ProcessDefinition suggestSteps(
             @V("topic") String topic,
             @V("description") String description
+    );
+
+    // [Updated] Smart Step Insertion API (Context-Aware)
+    @UserMessage("""
+        Suggest a **SINGLE** process step to be inserted at the specified index within the current workflow.
+        
+        [Context]
+        Topic: {{topic}}
+        Overall Goal: {{context}}
+        Insertion Index: {{stepIndex}} (The new step will be placed here)
+        
+        [Current Process Flow]
+        {{currentSteps}}
+        
+        [Goal]
+        - Analyze the steps BEFORE and AFTER the insertion index.
+        - Suggest a **missing link** or a **logical bridge** between them.
+        - If inserting at the end, suggest a logical conclusion or next action.
+        - If inserting at the beginning, suggest a preparation or initiation step.
+        - **Consistency:** Ensure the role and action type fit the surrounding context.
+        
+        [Output Requirement]
+        Return a **SINGLE JSON object** matching `ProcessStep` structure:
+        - `stepId`: Generate a temporary ID.
+        - `name`: Concise title.
+        - `role`: The actor for this step.
+        - `description`: Detailed action description explaining why this step is needed here.
+        - `type`: 'ACTION' or 'DECISION'.
+    """)
+    ProcessStep suggestSingleStep(
+            @V("topic") String topic,
+            @V("context") String context,
+            @V("stepIndex") int stepIndex,
+            @V("currentSteps") List<String> currentSteps // [Updated] All steps
     );
 }

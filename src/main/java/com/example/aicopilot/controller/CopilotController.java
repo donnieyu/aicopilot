@@ -4,6 +4,7 @@ import com.example.aicopilot.agent.ProcessOutliner;
 import com.example.aicopilot.agent.SuggestionAgent;
 import com.example.aicopilot.dto.JobStatus;
 import com.example.aicopilot.dto.definition.ProcessDefinition;
+import com.example.aicopilot.dto.definition.ProcessStep;
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
 import com.example.aicopilot.service.DataContextService;
 import com.example.aicopilot.service.JobRepository;
@@ -14,9 +15,11 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/copilot")
@@ -26,11 +29,11 @@ public class CopilotController {
     private final WorkflowOrchestrator orchestrator;
     private final JobRepository jobRepository;
     private final SuggestionAgent suggestionAgent;
-    private final ProcessOutliner processOutliner; // [New] 주입
+    private final ProcessOutliner processOutliner;
     private final DataContextService dataContextService;
     private final ObjectMapper objectMapper;
 
-    // ... (startJob, transformJob, getStatus는 기존 유지) ...
+    // ... (Existing APIs) ...
     @PostMapping("/start")
     public ResponseEntity<?> startJob(@RequestBody Map<String, String> request) {
         String prompt = request.get("userPrompt");
@@ -64,15 +67,7 @@ public class CopilotController {
                 .body(status);
     }
 
-    // -------------------------------------------------------------------------
-    // Suggestion APIs (Split by Type)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Type 1: Graph Context Suggestion (Next Best Action)
-     * 기존 /suggest -> /suggest/graph 로 명확화 (기존 클라이언트 호환성을 위해 유지하거나 변경)
-     */
-    @PostMapping("/suggest/graph") // URL 변경 권장
+    @PostMapping("/suggest/graph")
     public ResponseEntity<SuggestionResponse> suggestNextNode(@RequestBody Map<String, String> request) {
         String currentGraphJson = request.get("currentGraphJson");
         String focusNodeId = request.get("focusNodeId");
@@ -98,16 +93,11 @@ public class CopilotController {
         return ResponseEntity.ok(response);
     }
 
-    // [Legacy Support] 기존 엔드포인트 유지 (필요 시)
     @PostMapping("/suggest")
     public ResponseEntity<SuggestionResponse> suggestLegacy(@RequestBody Map<String, String> request) {
         return suggestNextNode(request);
     }
 
-    /**
-     * Type 2: Outline Suggestion (Drafting Phase) [New]
-     * 주제와 설명을 주면 프로세스 단계(Steps)를 제안합니다.
-     */
     @PostMapping("/suggest/outline")
     public ResponseEntity<ProcessDefinition> suggestOutline(@RequestBody Map<String, String> request) {
         String topic = request.get("topic");
@@ -115,5 +105,37 @@ public class CopilotController {
 
         ProcessDefinition definition = processOutliner.suggestSteps(topic, description);
         return ResponseEntity.ok(definition);
+    }
+
+    // [Updated] Step Suggestion API using FULL Context (Before & After)
+    @PostMapping("/suggest/step")
+    public ResponseEntity<ProcessStep> suggestStepDetail(@RequestBody Map<String, Object> request) {
+        String topic = (String) request.get("topic");
+        String context = (String) request.get("context");
+        Integer stepIndex = (Integer) request.get("stepIndex");
+
+        // [Updated] Receive ALL steps, not just previous ones
+        List<Map<String, String>> rawSteps = (List<Map<String, String>>) request.get("currentSteps");
+
+        if (topic == null || stepIndex == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Convert raw steps to a summarized list with index markers
+        List<String> stepSummaries = List.of();
+        if (rawSteps != null) {
+            final int[] index = {0};
+            stepSummaries = rawSteps.stream()
+                    .map(s -> String.format("[%d] %s (%s)", index[0]++, s.get("name"), s.get("role")))
+                    .collect(Collectors.toList());
+        }
+
+        ProcessStep suggestedStep = processOutliner.suggestSingleStep(
+                topic,
+                context != null ? context : "",
+                stepIndex,
+                stepSummaries
+        );
+        return ResponseEntity.ok(suggestedStep);
     }
 }
