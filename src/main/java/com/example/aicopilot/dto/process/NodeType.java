@@ -5,10 +5,14 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Defines the semantic type of a workflow node.
- * Used to determine the behavior and required configuration of an Activity.
- *
+ * [Update] Added explicit START_EVENT and END_EVENT for structural integrity.
  */
 public enum NodeType {
+    /**
+     * Represents the logical start of the process.
+     */
+    START_EVENT("start_event"),
+
     /**
      * Represents a step requiring human interaction (e.g., filling a form, approval).
      * configuration: { "formId": "...", "assignee": "..." }
@@ -25,7 +29,13 @@ public enum NodeType {
      * Represents a logical branching point (e.g., exclusively choosing one path).
      * configuration: { "conditions": [ { "expression": "...", "targetId": "..." } ] }
      */
-    EXCLUSIVE_GATEWAY("exclusive_gateway");
+    EXCLUSIVE_GATEWAY("exclusive_gateway"),
+
+    /**
+     * Represents the logical end of the process.
+     * MUST NOT have a nextActivityId.
+     */
+    END_EVENT("end_event");
 
     private final String value;
 

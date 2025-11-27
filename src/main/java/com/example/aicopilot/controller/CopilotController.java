@@ -1,9 +1,11 @@
 package com.example.aicopilot.controller;
 
+import com.example.aicopilot.agent.ProcessOutliner;
 import com.example.aicopilot.agent.SuggestionAgent;
 import com.example.aicopilot.dto.JobStatus;
 import com.example.aicopilot.dto.definition.ProcessDefinition;
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
+import com.example.aicopilot.service.DataContextService;
 import com.example.aicopilot.service.JobRepository;
 import com.example.aicopilot.service.WorkflowOrchestrator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,57 +26,37 @@ public class CopilotController {
     private final WorkflowOrchestrator orchestrator;
     private final JobRepository jobRepository;
     private final SuggestionAgent suggestionAgent;
+    private final ProcessOutliner processOutliner; // [New] 주입
+    private final DataContextService dataContextService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 1. [Mode A] Quick Start (자연어 -> 리스트 -> 맵)
-     */
+    // ... (startJob, transformJob, getStatus는 기존 유지) ...
     @PostMapping("/start")
     public ResponseEntity<?> startJob(@RequestBody Map<String, String> request) {
         String prompt = request.get("userPrompt");
         String jobId = UUID.randomUUID().toString();
-
         jobRepository.initJob(jobId);
-        orchestrator.runQuickStartJob(jobId, prompt); // Quick Start 모드 실행
-
-        return ResponseEntity.accepted().body(Map.of(
-                "jobId", jobId,
-                "message", "Mode A (Quick Start) 작업이 시작되었습니다."
-        ));
+        orchestrator.runQuickStartJob(jobId, prompt);
+        return ResponseEntity.accepted().body(Map.of("jobId", jobId, "message", "Mode A Started"));
     }
 
-    /**
-     * 2. [Mode B] Transformation (리스트 JSON -> 맵)
-     * 프론트엔드에서 편집한 '단계 리스트'를 기반으로 맵 생성을 요청합니다.
-     */
     @PostMapping("/transform")
     public ResponseEntity<?> transformJob(@RequestBody ProcessDefinition definition) {
         String jobId = UUID.randomUUID().toString();
-
         try {
             String definitionJson = objectMapper.writeValueAsString(definition);
-
             jobRepository.initJob(jobId);
-            orchestrator.runTransformationJob(jobId, definitionJson); // Transformation 모드 실행
-
-            return ResponseEntity.accepted().body(Map.of(
-                    "jobId", jobId,
-                    "message", "Mode B (Transformation) 작업이 시작되었습니다."
-            ));
+            orchestrator.runTransformationJob(jobId, definitionJson);
+            return ResponseEntity.accepted().body(Map.of("jobId", jobId, "message", "Mode B Started"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid Process Definition Format");
+            return ResponseEntity.badRequest().body("Invalid Definition");
         }
     }
 
-    /**
-     * 3. 상태 조회 (Polling)
-     */
     @GetMapping("/status/{jobId}")
     public ResponseEntity<?> getStatus(@PathVariable String jobId) {
         JobStatus status = jobRepository.findById(jobId);
-        if (status == null) {
-            return ResponseEntity.notFound().build();
-        }
+        if (status == null) return ResponseEntity.notFound().build();
         String etag = "\"" + status.version() + "\"";
         return ResponseEntity.ok()
                 .eTag(etag)
@@ -82,16 +64,56 @@ public class CopilotController {
                 .body(status);
     }
 
+    // -------------------------------------------------------------------------
+    // Suggestion APIs (Split by Type)
+    // -------------------------------------------------------------------------
+
     /**
-     * 4. 실시간 제안 (On-Demand)
+     * Type 1: Graph Context Suggestion (Next Best Action)
+     * 기존 /suggest -> /suggest/graph 로 명확화 (기존 클라이언트 호환성을 위해 유지하거나 변경)
      */
-    @PostMapping("/suggest")
-    public ResponseEntity<SuggestionResponse> suggestNextSteps(@RequestBody Map<String, String> request) {
+    @PostMapping("/suggest/graph") // URL 변경 권장
+    public ResponseEntity<SuggestionResponse> suggestNextNode(@RequestBody Map<String, String> request) {
         String currentGraphJson = request.get("currentGraphJson");
         String focusNodeId = request.get("focusNodeId");
-        String prompt = "Analyze the provided graph and suggest the next logical steps after node: " + focusNodeId;
+        String jobId = request.get("jobId");
 
-        SuggestionResponse response = suggestionAgent.suggestNextSteps(prompt, currentGraphJson, focusNodeId);
+        String availableVarsJson = "[]";
+        if (jobId != null) {
+            JobStatus job = jobRepository.findById(jobId);
+            if (job != null && job.processResponse() != null && job.dataEntitiesResponse() != null) {
+                availableVarsJson = dataContextService.getAvailableVariablesJson(
+                        job.processResponse(),
+                        job.dataEntitiesResponse(),
+                        focusNodeId
+                );
+            }
+        }
+
+        SuggestionResponse response = suggestionAgent.suggestNextSteps(
+                currentGraphJson,
+                focusNodeId,
+                availableVarsJson
+        );
         return ResponseEntity.ok(response);
+    }
+
+    // [Legacy Support] 기존 엔드포인트 유지 (필요 시)
+    @PostMapping("/suggest")
+    public ResponseEntity<SuggestionResponse> suggestLegacy(@RequestBody Map<String, String> request) {
+        return suggestNextNode(request);
+    }
+
+    /**
+     * Type 2: Outline Suggestion (Drafting Phase) [New]
+     * 주제와 설명을 주면 프로세스 단계(Steps)를 제안합니다.
+     */
+    @PostMapping("/suggest/outline")
+    public ResponseEntity<ProcessDefinition> suggestOutline(@RequestBody Map<String, String> request) {
+        String topic = request.get("topic");
+        String description = request.get("description");
+
+        ProcessDefinition definition = processOutliner.suggestSteps(topic, description);
+        return ResponseEntity.ok(definition);
     }
 }
