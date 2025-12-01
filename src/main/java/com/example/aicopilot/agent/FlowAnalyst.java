@@ -1,7 +1,7 @@
 package com.example.aicopilot.agent;
 
 import com.example.aicopilot.dto.analysis.AnalysisReport;
-import com.example.aicopilot.dto.analysis.GraphStructure; // [New] Import
+import com.example.aicopilot.dto.analysis.GraphStructure;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
@@ -10,6 +10,7 @@ import dev.langchain4j.service.spring.AiService;
 @AiService
 public interface FlowAnalyst {
 
+    // ... (analyzeGraph method remains same)
     @SystemMessage("""
         You are a 'Senior Business Process Auditor'.
         Your job is to find LOGICAL and BUSINESS gaps, NOT syntax errors.
@@ -46,7 +47,7 @@ public interface FlowAnalyst {
             @V("edgesJson") String edgesJson
     );
 
-    // [New] Auto-Fix Capability
+    // [Updated] Auto-Fix Capability with Description
     @SystemMessage("""
         You are an expert 'Process Repair Agent'.
         Your goal is to FIX a specific error in the provided BPMN graph structure.
@@ -60,7 +61,10 @@ public interface FlowAnalyst {
         3. **Constraint:** Keep the existing graph structure as much as possible. Only modify what is necessary.
         
         ### Output
-        Return a JSON object with `nodes` and `edges` arrays representing the CORRECTED graph.
+        Return a JSON object with:
+        - `nodes`: The corrected list of nodes.
+        - `edges`: The corrected list of edges.
+        - `fixDescription`: A concise summary of what was changed (e.g., "Added 'Reject Notification' task and connected it to 'Review Request'").
     """)
     @UserMessage("""
         Fix the following error in the process graph.
@@ -73,7 +77,7 @@ public interface FlowAnalyst {
         Target Node ID: {{targetNodeId}}
         Suggestion: {{suggestion}}
         
-        Return the FIXED nodes and edges.
+        Return the FIXED nodes and edges along with a description of the fix.
     """)
     GraphStructure fixGraph(
             @V("graphJson") String graphJson,

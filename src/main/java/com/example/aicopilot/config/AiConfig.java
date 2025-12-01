@@ -22,6 +22,8 @@ public class AiConfig {
                 .temperature(0.0) // [Optimization] Deterministic response -> Speed improvement
                 .topP(0.9) // [Optimization] Limit token selection range
                 .timeout(Duration.ofSeconds(60)) // Sufficient timeout
+                // [Fix] Force JSON output mode to prevent markdown formatting errors
+                .responseFormat("json_object")
                 .build();
     }
 }

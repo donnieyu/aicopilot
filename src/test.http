@@ -195,3 +195,331 @@ Content-Type: application/json
   ],
   "existingForms": []
 }
+
+### [New] Fix Process Graph Test
+# 시나리오: 'MISSING_OUTPUT' 에러를 수정하는 요청입니다.
+# 'Review Request' 노드에서 나가는 연결선이 없는 상황을 가정합니다.
+# 기대 결과: AI가 'Review Request' 노드에서 다음 노드(예: 'Notify Employee' 또는 'End')로 연결하는 엣지를 추가해야 합니다.
+POST http://localhost:8080/api/copilot/analyze/fix
+Content-Type: application/json
+
+{
+  "graphSnapshot": {
+    "nodes": [
+      {
+        "id": "lane_employee",
+        "type": "SWIMLANE",
+        "data": {
+          "label": "Employee",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "lane_manager",
+        "type": "SWIMLANE",
+        "data": {
+          "label": "Manager",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 700,
+          "y": 0
+        }
+      },
+      {
+        "id": "lane_finance_team",
+        "type": "SWIMLANE",
+        "data": {
+          "label": "Finance Team",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 1400,
+          "y": 0
+        }
+      },
+      {
+        "id": "node_1_form",
+        "type": "USER_TASK",
+        "data": {
+          "id": "node_1_form",
+          "type": "USER_TASK",
+          "label": "Submit Request",
+          "swimlaneId": "lane_employee",
+          "description": "The employee prepares and submits a financial request or document for review, ensuring all necessary information is included.",
+          "configuration": {
+            "configType": "userTask",
+            "participantRole": "Employee",
+            "formKey": "submitRequestForm",
+            "isApproval": false,
+            "dueDuration": "PT2H",
+            "templateId": "template_submit_request",
+            "subject": "Financial Request Submission",
+            "retryCount": 1,
+            "priority": "normal",
+            "defaultNextActivityId": "node_2_form",
+            "conditions": []
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": "node_2_form",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 250,
+          "y": 220
+        }
+      },
+      {
+        "id": "node_2_form",
+        "type": "USER_TASK",
+        "data": {
+          "id": "node_2_form",
+          "type": "USER_TASK",
+          "label": "Review Request",
+          "swimlaneId": "lane_manager",
+          "description": "The manager reviews the submitted request for completeness and accuracy, checking against company policies and budget constraints.",
+          "configuration": {
+            "configType": "userTask",
+            "participantRole": "Manager",
+            "formKey": "reviewRequestForm",
+            "isApproval": false,
+            "dueDuration": "PT2H",
+            "templateId": "template_review_request",
+            "subject": "Review Financial Request",
+            "retryCount": 1,
+            "priority": "normal",
+            "defaultNextActivityId": "node_3_gateway",
+            "conditions": []
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": "node_3_gateway",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 730,
+          "y": 160
+        }
+      },
+      {
+        "id": "node_3_gateway",
+        "type": "EXCLUSIVE_GATEWAY",
+        "data": {
+          "id": "node_3_gateway",
+          "type": "EXCLUSIVE_GATEWAY",
+          "label": "Approve/Reject Request",
+          "swimlaneId": "lane_manager",
+          "description": "The manager makes a decision to either approve or reject the request based on the review findings.",
+          "configuration": {
+            "configType": "gateway",
+            "participantRole": "Manager",
+            "formKey": null,
+            "isApproval": false,
+            "dueDuration": null,
+            "templateId": null,
+            "subject": null,
+            "retryCount": 0,
+            "priority": null,
+            "defaultNextActivityId": null,
+            "conditions": [
+              {
+                "expression": "Approve",
+                "targetActivityId": "node_4_form"
+              },
+              {
+                "expression": "Reject",
+                "targetActivityId": "node_4_reject"
+              }
+            ]
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": null,
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 1010,
+          "y": 160
+        }
+      },
+      {
+        "id": "node_4_form",
+        "type": "USER_TASK",
+        "data": {
+          "id": "node_4_form",
+          "type": "USER_TASK",
+          "label": "Notify Employee",
+          "swimlaneId": "lane_manager",
+          "description": "The manager communicates the decision to the employee, providing feedback if the request is rejected.",
+          "configuration": {
+            "configType": "userTask",
+            "participantRole": "Manager",
+            "formKey": "notifyEmployeeForm",
+            "isApproval": false,
+            "dueDuration": "PT1H",
+            "templateId": "template_notify_employee",
+            "subject": "Financial Request Decision",
+            "retryCount": 1,
+            "priority": "normal",
+            "defaultNextActivityId": "node_5_form",
+            "conditions": []
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": "node_5_form",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 1170,
+          "y": 150
+        }
+      },
+      {
+        "id": "node_4_reject",
+        "type": "USER_TASK",
+        "data": {
+          "id": "node_4_reject",
+          "type": "USER_TASK",
+          "label": "Reject Notification",
+          "swimlaneId": "lane_manager",
+          "description": "The manager notifies the employee that the request has been rejected, prompting for resubmission.",
+          "configuration": {
+            "configType": "userTask",
+            "participantRole": "Manager",
+            "formKey": "rejectNotificationForm",
+            "isApproval": false,
+            "dueDuration": "PT1H",
+            "templateId": "template_reject_notification",
+            "subject": "Financial Request Rejection",
+            "retryCount": 1,
+            "priority": "normal",
+            "defaultNextActivityId": "node_1_form",
+            "conditions": []
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": "node_1_form",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 1170,
+          "y": 290
+        }
+      },
+      {
+        "id": "node_5_form",
+        "type": "USER_TASK",
+        "data": {
+          "id": "node_5_form",
+          "type": "USER_TASK",
+          "label": "Process Approved Request",
+          "swimlaneId": "lane_finance_team",
+          "description": "If approved, the finance team processes the request, ensuring that funds are allocated and necessary documentation is completed.",
+          "configuration": {
+            "configType": "userTask",
+            "participantRole": "Finance Team",
+            "formKey": "processApprovedRequestForm",
+            "isApproval": false,
+            "dueDuration": "PT3H",
+            "templateId": "template_process_approved_request",
+            "subject": "Processing Approved Financial Request",
+            "retryCount": 1,
+            "priority": "high",
+            "defaultNextActivityId": "node_end",
+            "conditions": []
+          },
+          "inputMapping": {},
+          "position": {},
+          "nextActivityId": "node_end",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 1650,
+          "y": 150
+        }
+      },
+      {
+        "id": "node_start",
+        "type": "START",
+        "data": {
+          "label": "Start",
+          "swimlaneId": "lane_employee",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": -150,
+          "y": 210
+        }
+      },
+      {
+        "id": "node_end_point",
+        "type": "END",
+        "data": {
+          "label": "End",
+          "swimlaneId": "lane_finance_team",
+          "layoutDirection": "LR"
+        },
+        "position": {
+          "x": 2200,
+          "y": 210
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-node_1_form-node_2_form",
+        "source": "node_1_form",
+        "target": "node_2_form"
+      },
+      {
+        "id": "e-node_2_form-node_3_gateway",
+        "source": "node_2_form",
+        "target": "node_3_gateway"
+      },
+      {
+        "id": "e-node_3_gateway-node_4_form-0",
+        "source": "node_3_gateway",
+        "target": "node_4_form",
+        "label": "Approve"
+      },
+      {
+        "id": "e-node_3_gateway-node_4_reject-1",
+        "source": "node_3_gateway",
+        "target": "node_4_reject",
+        "label": "Reject"
+      },
+      {
+        "id": "e-node_4_form-node_5_form",
+        "source": "node_4_form",
+        "target": "node_5_form"
+      },
+      {
+        "id": "e-node_4_reject-node_1_form",
+        "source": "node_4_reject",
+        "target": "node_1_form"
+      },
+      {
+        "id": "e-start-node_1_form",
+        "source": "node_start",
+        "target": "node_1_form"
+      },
+      {
+        "id": "e-node_5_form-node_end_point",
+        "source": "node_5_form",
+        "target": "node_end_point"
+      }
+    ]
+  },
+  "error": {
+    "targetNodeId": "node_3_gateway",
+    "severity": "ERROR",
+    "type": "business_logic",
+    "message": "The approval process does not have a clear rejection path for the employee.",
+    "suggestion": "Ensure that the rejection path is clearly defined and communicated to the employee."
+  }
+}
