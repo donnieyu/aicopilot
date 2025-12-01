@@ -1,14 +1,19 @@
 package com.example.aicopilot.controller;
 
+import com.example.aicopilot.agent.DataModeler;
 import com.example.aicopilot.agent.FlowAnalyst;
+import com.example.aicopilot.agent.FormUXDesigner; // [New] Import
 import com.example.aicopilot.agent.ProcessOutliner;
 import com.example.aicopilot.agent.SuggestionAgent;
 import com.example.aicopilot.dto.JobStatus;
 import com.example.aicopilot.dto.analysis.AnalysisReport;
 import com.example.aicopilot.dto.analysis.AnalysisResult;
+import com.example.aicopilot.dto.dataEntities.DataEntitiesResponse;
 import com.example.aicopilot.dto.definition.ProcessDefinition;
 import com.example.aicopilot.dto.definition.ProcessStep;
-import com.example.aicopilot.dto.form.FormDefinitions; // [New] Import
+import com.example.aicopilot.dto.form.FormDefinitions;
+import com.example.aicopilot.dto.form.FormResponse; // [New] Import
+import com.example.aicopilot.dto.suggestion.AutoDiscoveryRequest;
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
 import com.example.aicopilot.service.DataContextService;
 import com.example.aicopilot.service.JobRepository;
@@ -35,8 +40,12 @@ public class CopilotController {
     private final SuggestionAgent suggestionAgent;
     private final ProcessOutliner processOutliner;
     private final FlowAnalyst flowAnalyst;
+    private final DataModeler dataModeler;
+    private final FormUXDesigner formUXDesigner; // [New] Injection
     private final DataContextService dataContextService;
     private final ObjectMapper objectMapper;
+
+    // ... (Existing methods: startJob, transformJob, getStatus, suggestNextNode, suggestLegacy, suggestOutline, suggestStepDetail, analyzeProcess, suggestForm)
 
     /**
      * 1. [Mode A] Quick Start (Natural Language -> List -> Map)
@@ -52,7 +61,6 @@ public class CopilotController {
 
     /**
      * 2. [Mode B] Transformation (List JSON -> Map)
-     * Requests map generation based on the 'step list' edited by the frontend.
      */
     @PostMapping("/transform")
     public ResponseEntity<?> transformJob(@RequestBody ProcessDefinition definition) {
@@ -110,7 +118,7 @@ public class CopilotController {
         return ResponseEntity.ok(response);
     }
 
-    // [Legacy Support] Keep existing endpoint if needed
+    // [Legacy Support]
     @PostMapping("/suggest")
     public ResponseEntity<SuggestionResponse> suggestLegacy(@RequestBody Map<String, String> request) {
         return suggestNextNode(request);
@@ -118,7 +126,6 @@ public class CopilotController {
 
     /**
      * 5. Outline Suggestion (Drafting Phase)
-     * Suggests process steps based on topic and description.
      */
     @PostMapping("/suggest/outline")
     public ResponseEntity<ProcessDefinition> suggestOutline(@RequestBody Map<String, String> request) {
@@ -131,22 +138,18 @@ public class CopilotController {
 
     /**
      * 6. Step Detail Suggestion API (Micro-Assistant)
-     * Suggests a single step using FULL Context (Before & After).
      */
     @PostMapping("/suggest/step")
     public ResponseEntity<ProcessStep> suggestStepDetail(@RequestBody Map<String, Object> request) {
         String topic = (String) request.get("topic");
         String context = (String) request.get("context");
         Integer stepIndex = (Integer) request.get("stepIndex");
-
-        // Receive ALL steps, not just previous ones
         List<Map<String, String>> rawSteps = (List<Map<String, String>>) request.get("currentSteps");
 
         if (topic == null || stepIndex == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        // Convert raw steps to a summarized list with index markers
         List<String> stepSummaries = List.of();
         if (rawSteps != null) {
             final int[] index = {0};
@@ -166,31 +169,26 @@ public class CopilotController {
 
     /**
      * 7. [Shadow Architect] Background Analysis Endpoint
-     * Triggered by frontend when user is idle after edits.
      */
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeProcess(@RequestBody Map<String, Object> graphSnapshot) {
         try {
-            // [Debug] Bean Injection Check
             if (flowAnalyst == null) {
-                throw new IllegalStateException("FlowAnalyst bean is not initialized. Please check @AiService configuration.");
+                throw new IllegalStateException("FlowAnalyst bean is not initialized.");
             }
 
-            // 프론트에서 보낸 가벼운 스냅샷 데이터 추출
             Object nodesObj = graphSnapshot.get("nodes");
             Object edgesObj = graphSnapshot.get("edges");
 
             if (nodesObj == null || edgesObj == null) {
-                throw new IllegalArgumentException("'nodes' or 'edges' data is missing in the request.");
+                throw new IllegalArgumentException("'nodes' or 'edges' data is missing.");
             }
 
             String nodesJson = objectMapper.writeValueAsString(nodesObj);
             String edgesJson = objectMapper.writeValueAsString(edgesObj);
 
-            // [Fix] Return wrapped report object instead of raw List to avoid Type Erasure issues in AI Service
             AnalysisReport report = flowAnalyst.analyzeGraph(nodesJson, edgesJson);
 
-            // Unwrap results for frontend
             return ResponseEntity.ok(report.results());
         } catch (Exception e) {
             e.printStackTrace();
@@ -202,8 +200,7 @@ public class CopilotController {
     }
 
     /**
-     * 8. [New] Form Suggestion Endpoint
-     * Generates a Form Definition from a natural language request.
+     * 8. Form Suggestion Endpoint (Manual Prompt)
      */
     @PostMapping("/suggest/form")
     public ResponseEntity<FormDefinitions> suggestForm(@RequestBody Map<String, String> request) {
@@ -213,5 +210,44 @@ public class CopilotController {
         }
         FormDefinitions form = suggestionAgent.suggestFormDefinition(prompt);
         return ResponseEntity.ok(form);
+    }
+
+    /**
+     * 9. Data Entity Auto-Discovery
+     */
+    @PostMapping("/suggest/data-model/auto-discovery")
+    public ResponseEntity<DataEntitiesResponse> suggestMissingEntities(@RequestBody AutoDiscoveryRequest request) {
+        try {
+            String processJson = objectMapper.writeValueAsString(request.processContext());
+            String dataJson = objectMapper.writeValueAsString(request.existingEntities());
+
+            DataEntitiesResponse suggestions = dataModeler.suggestMissingEntities(processJson, dataJson);
+            return ResponseEntity.ok(suggestions);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 10. [New] Form Auto-Discovery Endpoint
+     */
+    @PostMapping("/suggest/form/auto-discovery")
+    public ResponseEntity<FormResponse> suggestMissingForms(@RequestBody Map<String, Object> request) {
+        try {
+            Object processContext = request.get("processContext");
+            Object dataContext = request.get("existingEntities"); // Reusing 'existingEntities' from Data store
+            Object existingForms = request.get("existingForms");
+
+            String processJson = objectMapper.writeValueAsString(processContext);
+            String dataJson = objectMapper.writeValueAsString(dataContext);
+            String formsJson = objectMapper.writeValueAsString(existingForms);
+
+            FormResponse suggestions = formUXDesigner.suggestMissingForms(processJson, dataJson, formsJson);
+            return ResponseEntity.ok(suggestions);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

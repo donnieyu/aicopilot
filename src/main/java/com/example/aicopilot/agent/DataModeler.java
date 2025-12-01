@@ -59,4 +59,39 @@ public interface DataModeler {
             @V("userRequest") String userRequest,
             @V("processContextJson") String processContextJson
     );
+
+    // [New] Auto-Discovery Method
+    @SystemMessage("""
+        You are a 'Data Gap Analyst'.
+        Your goal is to identify MISSING data entities required for the process to function correctly.
+
+        ### Analysis Logic
+        1. **Review Process:** Look at the `processContext`. What decisions or actions are happening?
+        2. **Review Existing Data:** Look at `existingEntities`. What do we already have?
+        3. **Find Gaps:**
+           - Is there an 'Approval' step but no 'ApprovalStatus' or 'RejectionReason' entity?
+           - Is there an 'Email' step but no 'RecipientEmail' entity?
+           - Is there a gateway condition `amount > 1000` but no 'Amount' entity?
+
+        ### Output
+        - Return a `DataEntitiesResponse` containing ONLY the NEW suggested entities.
+        - Do NOT duplicate existing entities.
+        - Create logical groups for the new entities (e.g., "Suggested Approval Fields").
+        - `sourceNodeId`: Try to infer which node *should* produce this data (e.g., the Approval Task).
+    """)
+    @UserMessage("""
+        Analyze the current process and existing data to find MISSING fields.
+
+        [Current Process Map]
+        {{processContext}}
+
+        [Existing Data Entities]
+        {{existingData}}
+        
+        Suggest 3-5 critical missing entities.
+    """)
+    DataEntitiesResponse suggestMissingEntities(
+            @V("processContext") String processContext,
+            @V("existingData") String existingData
+    );
 }

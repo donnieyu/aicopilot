@@ -71,4 +71,43 @@ public interface FormUXDesigner {
             @V("processContext") String processContextJson,
             @V("dataContext") String dataContextJson
     );
+
+    // [New] Auto-Discovery Method for Forms
+    @SystemMessage("""
+        You are a 'Form Gap Analyst'.
+        Your goal is to identify MISSING forms or form sections required for the process to function correctly.
+
+        ### Analysis Logic
+        1. **Review Process:** Look at `processContext`. Which `USER_TASK` nodes exist?
+        2. **Review Data:** Look at `dataContext`. Which data entities are available?
+        3. **Review Existing Forms:** Look at `existingForms`. Which tasks already have forms?
+        
+        ### Goal
+        - Suggest a NEW Form Definition for a `USER_TASK` that currently lacks a form or needs a specific data input view.
+        - If 'Submit Request' task exists but no form is linked, create 'SubmissionForm'.
+        - If 'Approval' task exists, create 'ApprovalForm' (displaying data + decision fields).
+        - **STRICTLY USE** existing `dataContext` for bindings.
+
+        ### Output
+        - Return a `FormResponse` with the SUGGESTED form definition.
+    """)
+    @UserMessage("""
+        Analyze the current context and suggest a MISSING form.
+
+        [Current Process Map]
+        {{processContext}}
+
+        [Existing Data Entities]
+        {{dataContext}}
+
+        [Existing Forms]
+        {{existingForms}}
+        
+        Suggest ONE high-priority form that is missing.
+    """)
+    FormResponse suggestMissingForms(
+            @V("processContext") String processContext,
+            @V("dataContext") String dataContext,
+            @V("existingForms") String existingForms
+    );
 }

@@ -141,3 +141,57 @@ Content-Type: application/json
 {
   "prompt": "New form 2."
 }
+
+### [New] Data Auto-Discovery Test
+# 시나리오: 비용 처리 프로세스(Expense Report)의 구조만 있고 데이터 엔티티는 없는 상태.
+# 기대 결과: AI가 'ExpenseAmount', 'ReceiptImage', 'Description' 등의 필드를 제안해야 함.
+POST http://localhost:8080/api/copilot/suggest/data-model/auto-discovery
+Content-Type: application/json
+
+{
+  "processContext": {
+    "nodes": [
+      { "id": "node_start", "type": "START", "label": "Start" },
+      { "id": "node_submit", "type": "USER_TASK", "label": "Submit Expense Report", "description": "Employee submits travel expenses for reimbursement." },
+      { "id": "node_manager_review", "type": "USER_TASK", "label": "Manager Approval", "description": "Manager reviews the amount and receipt." },
+      { "id": "node_gateway", "type": "EXCLUSIVE_GATEWAY", "label": "Amount Check (> $1000)" },
+      { "id": "node_pay", "type": "SERVICE_TASK", "label": "Process Payment", "description": "Finance system processes the payment." },
+      { "id": "node_end", "type": "END", "label": "End" }
+    ],
+    "edges": [
+      { "source": "node_start", "target": "node_submit" },
+      { "source": "node_submit", "target": "node_manager_review" },
+      { "source": "node_manager_review", "target": "node_gateway" }
+    ]
+  },
+  "existingEntities": []
+}
+
+### [New] Form Auto-Discovery Test
+# 시나리오: 휴가 신청 프로세스는 정의되어 있고 데이터도 존재하지만, 폼(Form)이 아직 없는 상태.
+# 기대 결과: 'Submit Leave Request' 단계에 맞는 폼을 기존 데이터(StartDate, Reason 등)를 매핑하여 제안해야 함.
+POST http://localhost:8080/api/copilot/suggest/form/auto-discovery
+Content-Type: application/json
+
+{
+  "processContext": {
+    "nodes": [
+      { "id": "node_start", "type": "START", "label": "Start" },
+      { "id": "node_submit", "type": "USER_TASK", "label": "Submit Leave Request", "description": "Employee requests time off." },
+      { "id": "node_approve", "type": "USER_TASK", "label": "Manager Approval", "description": "Manager approves or rejects." },
+      { "id": "node_end", "type": "END", "label": "End" }
+    ],
+    "edges": [
+      { "source": "node_start", "target": "node_submit" },
+      { "source": "node_submit", "target": "node_approve" },
+      { "source": "node_approve", "target": "node_end" }
+    ]
+  },
+  "existingEntities": [
+    { "alias": "StartDate", "type": "date", "description": "Leave start date", "sourceNodeId": "node_submit" },
+    { "alias": "EndDate", "type": "date", "description": "Leave end date", "sourceNodeId": "node_submit" },
+    { "alias": "Reason", "type": "string", "description": "Reason for leave", "sourceNodeId": "node_submit" },
+    { "alias": "LeaveType", "type": "lookup", "description": "Type of leave (Annual, Sick)", "sourceNodeId": "node_submit", "lookupData": { "name": "Leave Type", "lookupItems": [{"value": "AL", "label": "Annual"}, {"value": "SL", "label": "Sick"}] } }
+  ],
+  "existingForms": []
+}
