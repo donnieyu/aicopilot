@@ -92,10 +92,13 @@ public class WorkflowOrchestrator {
 
         long duration = System.currentTimeMillis() - startTransform;
 
-        // [Key Change] Save artifact immediately upon process generation completion and update state.
-        // Frontend can render the process map via Polling at this point.
+        // [Key Change] Save artifact immediately upon process generation completion.
+        // Explicitly update JobStatus with the process response BEFORE publishing the event.
+        // This ensures frontend polling gets the map immediately.
         jobRepository.saveArtifact(jobId, "PROCESS", process, duration);
-        jobRepository.updateState(jobId, JobStatus.State.PROCESSING, "Process generation complete! Starting data modeling...");
+
+        // Update state message to indicate completion of map generation
+        jobRepository.updateState(jobId, JobStatus.State.PROCESSING, "Process map generated. Starting data modeling...");
 
         // Subsequent tasks (Data, Form) proceed asynchronously via event publishing
         eventPublisher.publishEvent(new ProcessGeneratedEvent(this, jobId, userRequest, process));

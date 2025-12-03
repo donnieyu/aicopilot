@@ -8,8 +8,9 @@ import com.example.aicopilot.agent.SuggestionAgent;
 import com.example.aicopilot.dto.JobStatus;
 import com.example.aicopilot.dto.analysis.AnalysisReport;
 import com.example.aicopilot.dto.analysis.AnalysisResult;
-import com.example.aicopilot.dto.analysis.FixGraphRequest; // [New] Import
-import com.example.aicopilot.dto.analysis.GraphStructure; // [New] Import
+import com.example.aicopilot.dto.analysis.AssetAnalysisResponse; // Kept for reference if needed
+import com.example.aicopilot.dto.analysis.FixGraphRequest;
+import com.example.aicopilot.dto.analysis.GraphStructure;
 import com.example.aicopilot.dto.dataEntities.DataEntitiesResponse;
 import com.example.aicopilot.dto.definition.ProcessDefinition;
 import com.example.aicopilot.dto.definition.ProcessStep;
@@ -17,14 +18,17 @@ import com.example.aicopilot.dto.form.FormDefinitions;
 import com.example.aicopilot.dto.form.FormResponse;
 import com.example.aicopilot.dto.suggestion.AutoDiscoveryRequest;
 import com.example.aicopilot.dto.suggestion.SuggestionResponse;
+import com.example.aicopilot.service.AssetAnalysisService;
 import com.example.aicopilot.service.DataContextService;
 import com.example.aicopilot.service.JobRepository;
 import com.example.aicopilot.service.WorkflowOrchestrator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -45,6 +49,7 @@ public class CopilotController {
     private final DataModeler dataModeler;
     private final FormUXDesigner formUXDesigner;
     private final DataContextService dataContextService;
+    private final AssetAnalysisService assetAnalysisService;
     private final ObjectMapper objectMapper;
 
     // ... (Existing methods: startJob, transformJob, getStatus, suggestNextNode, suggestLegacy, suggestOutline, suggestStepDetail)
@@ -179,7 +184,6 @@ public class CopilotController {
         }
     }
 
-    // [New] API Endpoint for Auto-Fix
     @PostMapping("/analyze/fix")
     public ResponseEntity<GraphStructure> fixError(@RequestBody FixGraphRequest request) {
         try {
@@ -242,5 +246,16 @@ public class CopilotController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    // [Updated] Asset Analysis Endpoint: Returns ProcessDefinition for Direct Map Generation
+    @PostMapping(value = "/analyze/asset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProcessDefinition> analyzeAsset(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        // Use the new method to get a full Process Definition
+        ProcessDefinition response = assetAnalysisService.analyzeAssetToDefinition(file);
+        return ResponseEntity.ok(response);
     }
 }

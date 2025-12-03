@@ -8,7 +8,10 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GraphStructure(
         @JsonProperty("nodes") List<GraphNode> nodes,
-        @JsonProperty("edges") List<GraphEdge> edges
+        @JsonProperty("edges") List<GraphEdge> edges,
+
+        // [New] AI가 수행한 수정 작업에 대한 설명 (e.g., "Added 'Reject Notification' task...")
+        @JsonProperty("fixDescription") String fixDescription
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GraphNode(
