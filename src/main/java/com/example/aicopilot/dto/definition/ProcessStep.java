@@ -1,5 +1,6 @@
 package com.example.aicopilot.dto.definition;
 
+import com.example.aicopilot.dto.common.SourceReference; // [New] Import
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
@@ -25,5 +26,9 @@ public record ProcessStep(
 
         @JsonProperty("type")
         @JsonPropertyDescription("Simple type: 'ACTION' (User/System) or 'DECISION' (Branching point).")
-        String type
+        String type,
+
+        // [New] Source Mapping Info
+        @JsonProperty("sourceRef")
+        SourceReference sourceRef
 ) {}

@@ -1,5 +1,6 @@
 package com.example.aicopilot.dto.process;
 
+import com.example.aicopilot.dto.common.SourceReference; // [New] Import
 import com.example.aicopilot.dto.process.config.NodeConfiguration;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
@@ -49,5 +50,9 @@ public record Activity(
                 - For TASKS: The single next step.
                 - For GATEWAYS: The 'Else' path (if no conditions match).
                 """)
-        String nextActivityId
+        String nextActivityId,
+
+        // [New] Source Mapping Info
+        @JsonProperty("sourceRef")
+        SourceReference sourceRef
 ) {}

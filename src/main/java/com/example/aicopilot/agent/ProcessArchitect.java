@@ -71,6 +71,11 @@ public interface ProcessArchitect {
            - **MANDATORY:** When conditions cover all paths, set `nextActivityId` to `null`.
            - **Reason:** Setting `nextActivityId` creates a default (unlabeled) edge. If you also have a condition for "Approve", it creates DUPLICATE edges, causing validation errors.
            - Use clear labels for expressions: "Approve", "Reject", "Yes", "No".
+           
+        ### 4. [NEW] Source Traceability Propagation
+        - If the input step has a `sourceRef`, **COPY IT** to the generated Activity node(s).
+        - If a single step generates multiple nodes (e.g., Task + Gateway), copy the `sourceRef` to **ALL** generated nodes.
+        - This allows the frontend to link the generated diagram back to the original image area.
 
         ### Input Data
         Process Definition List (JSON)
@@ -80,6 +85,7 @@ public interface ProcessArchitect {
         **REMEMBER:** 1. **Rejection Logic:** If a proposal is rejected, the Employee usually needs to modify and resubmit it. Link the 'Reject Notification' back to the 'Submit Proposal' step (node_1...).
         2. **Implicit End:** Do not create a node object for End. Just point `nextActivityId` to `"node_end"` where the flow should stop.
         3. **Gateway Config:** For gateways, set `nextActivityId` to `null` and define all paths in `conditions`.
+        4. **Source Ref:** Preserve `sourceRef` from input steps to output activities.
 
         [Process Definition List]
         {{definitionJson}}
@@ -97,6 +103,7 @@ public interface ProcessArchitect {
         1. If the error is about missing 'node_end' reference, ensure terminal nodes point to `"node_end"`.
         2. Do NOT create a physical node with id `"node_end"`.
         3. Identify the broken link. Replace it with a valid ID that **ACTUALLY EXISTS**.
+        4. **Preserve `sourceRef` data during fixes.**
         
         ### Original Definition
         {{definitionJson}}
